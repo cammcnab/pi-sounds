@@ -11,7 +11,7 @@ It is a Pi adaptation of the ideas and theme assets from [`ryparker/claude-code-
 - `/sounds status` for quick diagnostics
 - do-not-disturb support for:
   - meeting apps
-  - optional meeting integration when available
+  - Fellow meeting integration when available
   - night mute after a chosen hour
 
 ## Install
