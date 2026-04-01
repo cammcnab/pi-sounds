@@ -1,0 +1,183 @@
+{
+  "name": "Metal Gear Solid",
+  "description": "Iconic Metal Gear Solid sound effects — codec calls, alert sounds, and Snake voice lines",
+  "author": "ryparker",
+  "sources": ["myinstants.com"],
+  "sounds": {
+    "start": {
+      "description": "Session starting — codec call incoming",
+      "files": [
+        {
+          "name": "codec-call.mp3"
+        },
+        {
+          "name": "codec-ring.mp3"
+        },
+        {
+          "name": "kept-you-waiting-huh.mp3"
+        },
+        {
+          "name": "this-is-snake.mp3"
+        }
+      ]
+    },
+    "end": {
+      "description": "Session over — mission complete",
+      "files": [
+        {
+          "name": "codec-exit.mp3"
+        },
+        {
+          "name": "codec-close.mp3"
+        },
+        {
+          "name": "sweet-dreams.mp3"
+        },
+        {
+          "name": "mission-complete.mp3"
+        }
+      ]
+    },
+    "prompt": {
+      "description": "User submitted prompt — acknowledging orders",
+      "files": [
+        {
+          "name": "roger-that.mp3"
+        },
+        {
+          "name": "sounds-like-a-plan.mp3"
+        },
+        {
+          "name": "ill-do-my-best.mp3"
+        },
+        {
+          "name": "if-you-say-so.mp3"
+        }
+      ]
+    },
+    "stop": {
+      "description": "Done responding — codec transmission end",
+      "files": [
+        {
+          "name": "codec-hangup.mp3"
+        },
+        {
+          "name": "roger-that.mp3"
+        },
+        {
+          "name": "good-shooting.mp3"
+        }
+      ]
+    },
+    "permission": {
+      "description": "Permission prompt — alert detected",
+      "files": [
+        {
+          "name": "alert.mp3"
+        },
+        {
+          "name": "alert-sfx.mp3"
+        },
+        {
+          "name": "what-was-that-noise.mp3"
+        },
+        {
+          "name": "alert-mode.mp3"
+        }
+      ]
+    },
+    "idle": {
+      "description": "Waiting for input — standing by",
+      "files": [
+        {
+          "name": "kept-you-waiting.mp3"
+        },
+        {
+          "name": "just-to-suffer.mp3"
+        },
+        {
+          "name": "cigar.mp3"
+        }
+      ]
+    },
+    "subagent": {
+      "description": "Spawning subagent — calling for backup",
+      "files": [
+        {
+          "name": "codec-call-out.mp3"
+        },
+        {
+          "name": "codec-dial.mp3"
+        },
+        {
+          "name": "sounds-like-a-plan.mp3"
+        }
+      ]
+    },
+    "error": {
+      "description": "Tool failure — game over",
+      "files": [
+        {
+          "name": "game-over.mp3"
+        },
+        {
+          "name": "snake-scream.mp3"
+        },
+        {
+          "name": "snake-dies.mp3"
+        },
+        {
+          "name": "game-over-screen.mp3"
+        },
+        {
+          "name": "what-the-hell.mp3"
+        }
+      ]
+    },
+    "task-completed": {
+      "description": "Task finished — mission accomplished",
+      "files": [
+        {
+          "name": "youre-pretty-good.mp3"
+        },
+        {
+          "name": "mission-qualify.mp3"
+        },
+        {
+          "name": "good-shooting.mp3"
+        },
+        {
+          "name": "item-drop.mp3"
+        }
+      ]
+    },
+    "compact": {
+      "description": "Context compaction — stealth camo engaged",
+      "files": [
+        {
+          "name": "game-over-fade.mp3"
+        },
+        {
+          "name": "original-game-over.mp3"
+        },
+        {
+          "name": "ocelot-meow.mp3"
+        }
+      ]
+    },
+    "teammate-idle": {
+      "description": "Teammate went idle — waiting on comms",
+      "files": [
+        {
+          "name": "codec-beep.mp3"
+        },
+        {
+          "name": "friendly-fire.mp3"
+        },
+        {
+          "name": "what-was-that.mp3"
+        }
+      ]
+    }
+  }
+}

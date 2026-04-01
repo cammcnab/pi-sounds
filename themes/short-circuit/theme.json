@@ -1,0 +1,96 @@
+{
+  "name": "Short Circuit",
+  "description": "Number 5 is alive! Sound clips from the 1986 classic Short Circuit featuring the lovable sentient robot",
+  "author": "ryparker",
+  "sources": ["soundboard.com", "myinstants.com", "soundbible.com"],
+  "sounds": {
+    "start": {
+      "description": "Session starting — Number 5 comes alive",
+      "files": [
+        { "name": "number-5-is-alive.mp3" },
+        { "name": "hunky-dory.mp3" }
+      ]
+    },
+    "end": {
+      "description": "Session over — farewell",
+      "files": [
+        { "name": "tomorrow.mp3" },
+        { "name": "got-nobody.mp3" },
+        { "name": "good-lord.mp3" }
+      ]
+    },
+    "prompt": {
+      "description": "User submitted prompt — Number 5 needs input",
+      "files": [
+        { "name": "need-input.mp3" },
+        { "name": "read-fast.mp3" },
+        { "name": "ooo.mp3" }
+      ]
+    },
+    "stop": {
+      "description": "Done responding — task acknowledgment",
+      "files": [
+        { "name": "software.mp3" },
+        { "name": "enemy-neutralized.mp3" },
+        { "name": "one-piece-will-do.mp3" },
+        { "name": "yes-2.mp3" }
+      ]
+    },
+    "permission": {
+      "description": "Permission prompt — waiting for approval",
+      "files": [
+        { "name": "robot-alert.mp3" },
+        { "name": "robot-computing.mp3" },
+        { "name": "what-planet.mp3" },
+        { "name": "gas-money.mp3" }
+      ]
+    },
+    "idle": {
+      "description": "Waiting for input — Number 5 needs stimulation",
+      "files": [
+        { "name": "stupid.mp3" },
+        { "name": "dull-home-for-rodents.mp3" },
+        { "name": "blazing-pants.mp3" },
+        { "name": "nun-soup.mp3" }
+      ]
+    },
+    "subagent": {
+      "description": "Spawning subagent — dispatching a helper",
+      "files": [
+        { "name": "escaped-robot.mp3" },
+        { "name": "surrender-the-robot.mp3" },
+        { "name": "robot-arm-moving.mp3" },
+        { "name": "sci-fi-robot.mp3" }
+      ]
+    },
+    "error": {
+      "description": "Tool failure — malfunction detected",
+      "files": [
+        { "name": "malfunction.mp3" },
+        { "name": "malfunction-3.mp3" },
+        { "name": "malfunction-4.mp3" },
+        { "name": "short-circuit-zap.mp3" }
+      ]
+    },
+    "task-completed": {
+      "description": "Task finished — Number 5 celebrates",
+      "files": [
+        { "name": "number-5-is-alive-2.mp3" },
+        { "name": "hot-coffee.mp3" },
+        { "name": "scream-and-run.mp3" }
+      ]
+    },
+    "compact": {
+      "description": "Context compaction — memory overload",
+      "files": [{ "name": "dying-robot.mp3" }, { "name": "no.mp3" }]
+    },
+    "teammate-idle": {
+      "description": "Teammate went idle — Number 5 notices",
+      "files": [
+        { "name": "no.mp3" },
+        { "name": "stupid.mp3" },
+        { "name": "what-planet.mp3" }
+      ]
+    }
+  }
+}

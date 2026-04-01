@@ -4,7 +4,7 @@ import { Container, SelectList, type SelectItem } from "@mariozechner/pi-tui";
 import { promises as fs } from "node:fs";
 import os from "node:os";
 import path from "node:path";
-import { pathToFileURL } from "node:url";
+import { fileURLToPath, pathToFileURL } from "node:url";
 import { execFile, spawn } from "node:child_process";
 
 type FellowAuthModule = {
@@ -57,8 +57,11 @@ type FellowMeeting = {
   end_time?: string;
 };
 
+const EXTENSION_DIR = path.dirname(fileURLToPath(import.meta.url));
+const BUNDLED_THEMES_DIR = path.resolve(EXTENSION_DIR, "..", "themes");
 const SOUND_ROOT = path.join(os.homedir(), ".pi", "sounds");
 const THEMES_DIR = path.join(SOUND_ROOT, "themes");
+const THEME_SEARCH_DIRS = [THEMES_DIR, BUNDLED_THEMES_DIR];
 const CONFIG_PATH = path.join(SOUND_ROOT, "config.json");
 const SHOP_PI_FY_FELLOW_DIR = path.join(
   os.homedir(),
@@ -153,19 +156,47 @@ async function ensureConfig(): Promise<SoundConfig> {
   }
 }
 
-async function listInstalledThemes(): Promise<string[]> {
+async function pathExists(targetPath: string): Promise<boolean> {
   try {
-    const entries = await fs.readdir(THEMES_DIR, { withFileTypes: true });
-    return entries.filter((entry) => entry.isDirectory()).map((entry) => entry.name).sort();
+    await fs.access(targetPath);
+    return true;
   } catch {
-    return [];
+    return false;
   }
+}
+
+async function listInstalledThemes(): Promise<string[]> {
+  const names = new Set<string>();
+
+  for (const themesDir of THEME_SEARCH_DIRS) {
+    try {
+      const entries = await fs.readdir(themesDir, { withFileTypes: true });
+      for (const entry of entries) {
+        if (entry.isDirectory()) names.add(entry.name);
+      }
+    } catch {
+      // ignore missing theme directories
+    }
+  }
+
+  return [...names].sort();
+}
+
+async function resolveThemeDir(theme: string): Promise<string | null> {
+  for (const themesDir of THEME_SEARCH_DIRS) {
+    const themeDir = path.join(themesDir, theme);
+    if (await pathExists(path.join(themeDir, "theme.json"))) {
+      return themeDir;
+    }
+  }
+  return null;
 }
 
 async function readTheme(theme: string): Promise<ThemeJson | null> {
   try {
-    const themePath = path.join(THEMES_DIR, theme, "theme.json");
-    const raw = await fs.readFile(themePath, "utf8");
+    const themeDir = await resolveThemeDir(theme);
+    if (!themeDir) return null;
+    const raw = await fs.readFile(path.join(themeDir, "theme.json"), "utf8");
     return JSON.parse(raw) as ThemeJson;
   } catch {
     return null;
@@ -194,18 +225,16 @@ function isSoundCategory(value: string): value is SoundCategory {
 }
 
 async function resolveSoundFile(theme: string, category: SoundCategory): Promise<string | null> {
+  const themeDir = await resolveThemeDir(theme);
+  if (!themeDir) return null;
+
   const themeJson = await readTheme(theme);
   const candidates = themeJson?.sounds?.[category]?.files?.map((file) => file.name).filter(Boolean) as string[] | undefined;
   const picked = pickRandom(candidates ?? []);
   if (!picked) return null;
 
-  const filePath = path.join(THEMES_DIR, theme, "sounds", picked);
-  try {
-    await fs.access(filePath);
-    return filePath;
-  } catch {
-    return null;
-  }
+  const filePath = path.join(themeDir, "sounds", picked);
+  return (await pathExists(filePath)) ? filePath : null;
 }
 
 function execFileText(command: string, args: string[]): Promise<string> {

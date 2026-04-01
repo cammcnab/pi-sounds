@@ -1,0 +1,204 @@
+{
+  "name": "Zelda: Ocarina of Time",
+  "description": "Navi, Link, and iconic OOT jingles — Hey! Listen!",
+  "author": "ryparker",
+  "sources": ["noproblo.dayjo.org"],
+  "sounds": {
+    "start": {
+      "description": "Session starting — Navi greets you",
+      "files": [
+        {
+          "name": "hey.mp3"
+        },
+        {
+          "name": "hello.mp3"
+        },
+        {
+          "name": "listen.mp3"
+        },
+        {
+          "name": "great-fairy-laugh.mp3"
+        },
+        {
+          "name": "open-chest.mp3"
+        }
+      ]
+    },
+    "end": {
+      "description": "Session over — quest complete",
+      "files": [
+        {
+          "name": "item-fanfare.mp3"
+        },
+        {
+          "name": "secret-discovered.mp3"
+        },
+        {
+          "name": "dialogue-done.mp3"
+        }
+      ]
+    },
+    "permission": {
+      "description": "Permission prompt — Navi warns you",
+      "files": [
+        {
+          "name": "watch-out.mp3"
+        },
+        {
+          "name": "hey.mp3"
+        },
+        {
+          "name": "listen.mp3"
+        },
+        {
+          "name": "pause-menu.mp3"
+        },
+        {
+          "name": "z-target.mp3"
+        }
+      ]
+    },
+    "stop": {
+      "description": "Done responding — loot collected",
+      "files": [
+        {
+          "name": "secret-discovered.mp3"
+        },
+        {
+          "name": "get-item.mp3"
+        },
+        {
+          "name": "get-rupee.mp3"
+        },
+        {
+          "name": "open-small-chest.mp3"
+        },
+        {
+          "name": "song-correct.mp3"
+        }
+      ]
+    },
+    "subagent": {
+      "description": "Spawning subagent — Link attacks",
+      "files": [
+        {
+          "name": "sword-draw.mp3"
+        },
+        {
+          "name": "link-attack.mp3"
+        },
+        {
+          "name": "link-strong-attack.mp3"
+        },
+        {
+          "name": "hey.mp3"
+        },
+        {
+          "name": "spin-attack.mp3"
+        }
+      ]
+    },
+    "idle": {
+      "description": "Waiting for input — Navi pesters you",
+      "files": [
+        {
+          "name": "hey.mp3"
+        },
+        {
+          "name": "listen.mp3"
+        },
+        {
+          "name": "watch-out.mp3"
+        },
+        {
+          "name": "low-health.mp3"
+        },
+        {
+          "name": "snore.mp3"
+        }
+      ]
+    },
+    "error": {
+      "description": "Tool failure — Link takes damage",
+      "files": [
+        {
+          "name": "error.mp3"
+        },
+        {
+          "name": "song-error.mp3"
+        },
+        {
+          "name": "link-hurt.mp3"
+        },
+        {
+          "name": "ganondorf-laugh.mp3"
+        }
+      ]
+    },
+    "prompt": {
+      "description": "User submitted prompt — adventure continues",
+      "files": [
+        {
+          "name": "hey.mp3"
+        },
+        {
+          "name": "look.mp3"
+        },
+        {
+          "name": "menu-select.mp3"
+        },
+        {
+          "name": "dialogue-next.mp3"
+        },
+        {
+          "name": "get-heart.mp3"
+        }
+      ]
+    },
+    "task-completed": {
+      "description": "Task finished — treasure acquired",
+      "files": [
+        {
+          "name": "item-fanfare.mp3"
+        },
+        {
+          "name": "secret-discovered.mp3"
+        }
+      ]
+    },
+    "compact": {
+      "description": "Context compaction — health running low",
+      "files": [
+        {
+          "name": "low-health.mp3"
+        },
+        {
+          "name": "pause-close.mp3"
+        },
+        {
+          "name": "watch-out.mp3"
+        },
+        {
+          "name": "error.mp3"
+        }
+      ]
+    },
+    "teammate-idle": {
+      "description": "Teammate went idle — Navi nags",
+      "files": [
+        {
+          "name": "hey.mp3"
+        },
+        {
+          "name": "listen.mp3"
+        },
+        {
+          "name": "watch-out.mp3"
+        },
+        {
+          "name": "low-health.mp3"
+        }
+      ]
+    }
+  }
+}
