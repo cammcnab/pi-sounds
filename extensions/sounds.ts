@@ -530,7 +530,7 @@ function buildMainDashboardItems(config: SoundConfig, fellowActive: boolean, pro
     { value: "volume", label: `Volume: ${Math.round(config.volume * 100)}%`, description: "←→ quick adjust • Enter for fixed steps" },
     { value: "enabled", label: `Sounds: ${config.enabled ? "on" : "off"}`, description: "Space toggles all sound effects" },
     { value: "dnd", label: `DND: ${config.dndEnabled || config.fellowDndEnabled || config.nightMuteEnabled ? "on" : "off"}`, description: "Space toggles all automatic muting" },
-    { value: "lead", label: `  ├─ Meeting lead time: ${config.fellowLeadMinutes}m`, description: "←→ quick adjust • Enter for fixed steps" },
+    { value: "lead", label: `  ├─ Fellow lead time: ${config.fellowLeadMinutes}m`, description: "←→ quick adjust • Enter for fixed steps" },
     { value: "fellowDnd", label: `  ├─ Fellow DND: ${config.fellowDndEnabled ? "on" : "off"}`, description: `Fellow is ${fellowActive ? "currently active" : "currently idle"}` },
     { value: "processDnd", label: `  ├─ Meeting Apps DND: ${config.dndEnabled ? "on" : "off"}`, description: `Meeting apps are ${processActive ? "currently active" : "currently idle"}` },
     { value: "nightMute", label: `  ├─ Night mute: ${config.nightMuteEnabled ? "on" : "off"}`, description: `Mute all sounds after ${formatHourLabel(config.muteAfterHour)}` },
@@ -730,7 +730,7 @@ async function showSoundsDashboard(ctx: any, config: SoundConfig, fellowActive: 
         const items = QUICK_LEAD_STEPS.map((step) => ({
           value: String(step),
           label: `${step}m`,
-          description: step === currentConfig.fellowLeadMinutes ? "Current lead time" : "Mute this many minutes before meetings",
+          description: step === currentConfig.fellowLeadMinutes ? "Current Fellow lead time" : "Mute this many minutes before Fellow meetings",
         }));
         selectList = new SelectList(items, Math.min(items.length, MAX_SOUNDS_MENU_VISIBLE), listTheme);
         leadIndex = Math.max(0, QUICK_LEAD_STEPS.findIndex((step) => step === currentConfig.fellowLeadMinutes));
