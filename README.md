@@ -53,7 +53,3 @@ Runtime config is stored in:
 - Fellow-based DND is optional and only works when Fellow support is available in Pi.
 - Desktop notifications are not part of this extension.
 
-## Attribution
-
-Bundled theme assets were seeded from `ryparker/claude-code-sounds`.
-See `LICENSE`.
