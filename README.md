@@ -10,7 +10,7 @@ It is a Pi adaptation of the ideas and theme assets from [`ryparker/claude-code-
 - `/sounds` dashboard for settings and previews
 - `/sounds status` for quick diagnostics
 - do-not-disturb support for:
-  - meeting apps
+  - meeting apps (`zoom.us`, `Zoom`, `Microsoft Teams`, `Teams`, `Webex`, `FaceTime`)
   - Fellow meeting integration when available
   - night mute after a chosen hour
 
