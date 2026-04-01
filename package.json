@@ -2,6 +2,11 @@
   "name": "pi-sounds",
   "version": "0.1.0",
   "description": "A Pi package that adds sound effects and a /sounds dashboard.",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/cammcnab/pi-sounds.git"
+  },
+  "homepage": "https://github.com/cammcnab/pi-sounds",
   "type": "module",
   "keywords": [
     "pi-package",

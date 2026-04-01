@@ -73,8 +73,10 @@ Because Pi loads local packages directly from the filesystem path, edits in this
 ### Install from GitHub
 
 ```bash
-pi install https://github.com/<you>/pi-sounds
+pi install https://github.com/cammcnab/pi-sounds
 ```
+
+This repository is currently private, so coworkers will need access to the repo before installing from GitHub.
 
 ## Current defaults
 
