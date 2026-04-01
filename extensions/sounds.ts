@@ -63,26 +63,9 @@ const SOUND_ROOT = path.join(os.homedir(), ".pi", "sounds");
 const THEMES_DIR = path.join(SOUND_ROOT, "themes");
 const THEME_SEARCH_DIRS = [THEMES_DIR, BUNDLED_THEMES_DIR];
 const CONFIG_PATH = path.join(SOUND_ROOT, "config.json");
-const SHOP_PI_FY_FELLOW_DIR = path.join(
-  os.homedir(),
-  ".pi",
-  "agent",
-  "git",
-  "github.com",
-  "shopify-playground",
-  "shop-pi-fy",
-  "extensions",
-  "fellow",
-);
-const MAIN_EXTENSIONS_FELLOW_DIR = path.join(os.homedir(), ".pi", "agent", "extensions", "fellow");
-const FELLOW_AUTH_CANDIDATES = [
-  path.join(SHOP_PI_FY_FELLOW_DIR, "auth.ts"),
-  path.join(MAIN_EXTENSIONS_FELLOW_DIR, "auth.ts"),
-];
-const FELLOW_MCP_CANDIDATES = [
-  path.join(SHOP_PI_FY_FELLOW_DIR, "mcp.ts"),
-  path.join(MAIN_EXTENSIONS_FELLOW_DIR, "mcp.ts"),
-];
+const PI_AGENT_DIR = path.join(os.homedir(), ".pi", "agent");
+const GIT_PACKAGES_DIR = path.join(PI_AGENT_DIR, "git");
+const MAIN_EXTENSIONS_FELLOW_DIR = path.join(PI_AGENT_DIR, "extensions", "fellow");
 const DEFAULT_DND_PROCESSES = ["zoom.us", "Zoom", "Microsoft Teams", "Teams", "Webex", "FaceTime"];
 const DEFAULT_CONFIG: SoundConfig = {
   enabled: true,
@@ -317,6 +300,27 @@ function isActiveMeeting(meeting: FellowMeeting, now: Date, leadMinutes: number)
   return now.getTime() >= bufferedStart && now.getTime() <= end.getTime();
 }
 
+async function discoverFellowModuleCandidates(fileName: string): Promise<string[]> {
+  const candidates = [path.join(MAIN_EXTENSIONS_FELLOW_DIR, fileName)];
+
+  try {
+    const hosts = await fs.readdir(GIT_PACKAGES_DIR, { withFileTypes: true });
+    for (const host of hosts) {
+      if (!host.isDirectory()) continue;
+      const hostDir = path.join(GIT_PACKAGES_DIR, host.name);
+      const packages = await fs.readdir(hostDir, { withFileTypes: true });
+      for (const pkg of packages) {
+        if (!pkg.isDirectory()) continue;
+        candidates.push(path.join(hostDir, pkg.name, "extensions", "fellow", fileName));
+      }
+    }
+  } catch {
+    // ignore missing package directories
+  }
+
+  return candidates;
+}
+
 async function importFirstAvailableModule<T>(candidatePaths: string[]): Promise<T> {
   const errors: string[] = [];
 
@@ -333,8 +337,8 @@ async function importFirstAvailableModule<T>(candidatePaths: string[]): Promise<
 }
 
 async function loadFellowModules(): Promise<{ auth: FellowAuthModule; mcp: FellowMcpModule }> {
-  fellowAuthModulePromise ??= importFirstAvailableModule<FellowAuthModule>(FELLOW_AUTH_CANDIDATES);
-  fellowMcpModulePromise ??= importFirstAvailableModule<FellowMcpModule>(FELLOW_MCP_CANDIDATES);
+  fellowAuthModulePromise ??= discoverFellowModuleCandidates("auth.ts").then((paths) => importFirstAvailableModule<FellowAuthModule>(paths));
+  fellowMcpModulePromise ??= discoverFellowModuleCandidates("mcp.ts").then((paths) => importFirstAvailableModule<FellowMcpModule>(paths));
   const [auth, mcp] = await Promise.all([fellowAuthModulePromise, fellowMcpModulePromise]);
   return { auth, mcp };
 }

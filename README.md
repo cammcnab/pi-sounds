@@ -11,7 +11,7 @@ It is a Pi adaptation of the ideas and theme assets from [`ryparker/claude-code-
 - `/sounds status` for quick diagnostics
 - do-not-disturb support for:
   - meeting apps
-  - Fellow meetings, when Fellow support is available in Pi
+  - optional meeting integration when available
   - night mute after a chosen hour
 
 ## Install
@@ -50,6 +50,6 @@ Runtime config is stored in:
 ## Notes
 
 - Playback currently uses macOS `afplay`.
-- Fellow-based DND is optional and only works when Fellow support is available in Pi.
+- Meeting-aware DND is optional; Fellow support is used when available in Pi.
 - Desktop notifications are not part of this extension.
 
