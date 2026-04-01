@@ -1,0 +1,21 @@
+{
+  "name": "pi-sounds",
+  "version": "0.1.0",
+  "description": "A Pi package that adds sound effects and a /sounds dashboard.",
+  "type": "module",
+  "keywords": [
+    "pi-package",
+    "pi",
+    "sounds",
+    "tui"
+  ],
+  "peerDependencies": {
+    "@mariozechner/pi-coding-agent": "*",
+    "@mariozechner/pi-tui": "*"
+  },
+  "pi": {
+    "extensions": [
+      "./extensions/sounds.ts"
+    ]
+  }
+}
