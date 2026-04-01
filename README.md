@@ -2,10 +2,7 @@
 
 `pi-sounds` is a Pi extension that adds sound effects and a `/sounds` dashboard.
 
-This repo is self-contained for the core sounds experience:
-- the extension code is included
-- bundled sound themes are included
-- runtime config is created automatically
+It is a Pi adaptation of the ideas and theme assets from [`ryparker/claude-code-sounds`](https://github.com/ryparker/claude-code-sounds), repackaged for Pi's extension system and TUI workflow.
 
 ## Features
 
