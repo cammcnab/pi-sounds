@@ -70,7 +70,7 @@ const DEFAULT_DND_PROCESSES = ["zoom.us", "Zoom", "Microsoft Teams", "Teams", "W
 const DEFAULT_CONFIG: SoundConfig = {
   enabled: true,
   theme: "starcraft",
-  volume: 0.7,
+  volume: 0.2,
   dndEnabled: true,
   dndProcesses: DEFAULT_DND_PROCESSES,
   fellowDndEnabled: true,
@@ -491,7 +491,7 @@ type SoundsDashboardView = "main" | "theme" | "volume" | "lead" | "muteAfter" | 
 
 type MainDashboardAction = "theme" | "volume" | "enabled" | "dnd" | "lead" | "fellowDnd" | "processDnd" | "nightMute" | "muteAfter" | "test" | "status";
 
-const QUICK_VOLUME_STEPS = [0, 0.1, 0.25, 0.5, 0.7, 1];
+const QUICK_VOLUME_STEPS = Array.from({ length: 11 }, (_unused, index) => index / 10);
 const QUICK_LEAD_STEPS = [0, 1, 2, 5, 10];
 const QUICK_MUTE_AFTER_HOURS = Array.from({ length: 24 }, (_unused, hour) => hour);
 const MAX_SOUNDS_MENU_VISIBLE = 14;
@@ -917,18 +917,15 @@ async function showSoundsDashboard(ctx: any, config: SoundConfig, fellowActive: 
         }
 
         if (view === "theme" && data === " ") {
-          const item = selectList?.getSelectedItem();
-          if (item) {
-            void playThemePreview(item.value, currentConfig.volume);
+          const themeName = selectList?.getSelectedItem()?.value ?? String((selectList as any)?.items?.[themeIndex]?.value ?? "");
+          if (themeName) {
+            void playThemePreview(themeName, currentConfig.volume);
           }
           return;
         }
 
         if (view === "test" && data === " ") {
-          const item = selectList?.getSelectedItem();
-          if (item && isSoundCategory(item.value)) {
-            void playCategory(item.value, { bypassDnd: true });
-          }
+          selectList?.onSelect?.(selectList.getSelectedItem() ?? { value: "", label: "" });
           return;
         }
 
