@@ -83,7 +83,6 @@ Runtime config is stored in:
 
 - Playback currently uses macOS `afplay`.
 - Meeting-aware DND is optional; Fellow support is used only when it is already available in Pi.
-- Desktop notifications are intentionally not part of this extension.
 
 ## License
 
