@@ -1,12 +1,16 @@
 {
   "name": "pi-sounds",
   "version": "0.1.0",
-  "description": "A Pi extension that adds sound effects and a /sounds dashboard.",
+  "description": "A Pi extension that adds nostalgic sound effects and a /sounds dashboard.",
   "repository": {
     "type": "git",
     "url": "https://github.com/cammcnab/pi-sounds.git"
   },
   "homepage": "https://github.com/cammcnab/pi-sounds",
+  "bugs": {
+    "url": "https://github.com/cammcnab/pi-sounds/issues"
+  },
+  "license": "MIT",
   "files": [
     "extensions",
     "themes",
@@ -27,6 +31,7 @@
   "pi": {
     "extensions": [
       "./extensions/sounds.ts"
-    ]
+    ],
+    "image": "https://raw.githubusercontent.com/cammcnab/pi-sounds/main/.github/pi-sounds-preview.png"
   }
 }

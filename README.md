@@ -2,7 +2,9 @@
 
 `pi-sounds` is a Pi extension that adds nostalgic sound effects and a `/sounds` dashboard.
 
-It is a Pi adaptation of the ideas and theme assets from [`ryparker/claude-code-sounds`](https://github.com/ryparker/claude-code-sounds), repackaged for Pi's extension system and TUI workflow, with the addition of simple presets, and DND settings with optional auto-muting during meetings.
+![pi-sounds preview](./.github/pi-sounds-preview.png)
+
+It adapts the ideas and theme assets from [`ryparker/claude-code-sounds`](https://github.com/ryparker/claude-code-sounds) for Pi's extension system and TUI workflow, with Pi-specific settings, previews, and do-not-disturb controls.
 
 ## Features
 
@@ -22,15 +24,19 @@ From GitHub:
 pi install https://github.com/cammcnab/pi-sounds
 ```
 
-From a local checkout:
+From a local checkout during development:
 
 ```bash
 pi install /path/to/pi-sounds
 ```
 
-Then run `/reload` in Pi.
+Then reload Pi:
 
-## Commands
+```text
+/reload
+```
+
+After that, open:
 
 - `/sounds`
 - `/sounds status`
@@ -39,7 +45,7 @@ Then run `/reload` in Pi.
 
 This repo includes bundled sound themes under `themes/`.
 
-The extension will use:
+The extension uses:
 1. user themes in `~/.pi/sounds/themes/` when present
 2. bundled themes from this repo otherwise
 
@@ -50,6 +56,10 @@ Runtime config is stored in:
 ## Notes
 
 - Playback currently uses macOS `afplay`.
-- Meeting-aware DND is optional; Fellow support is used when available in Pi.
-- Desktop notifications are not part of this extension.
+- Meeting-aware DND is optional; Fellow support is used only when it is already available in Pi.
+- Desktop notifications are intentionally not part of this extension.
+
+## License
+
+Theme assets and inspiration come from [`ryparker/claude-code-sounds`](https://github.com/ryparker/claude-code-sounds). See [`LICENSE`](./LICENSE).
 

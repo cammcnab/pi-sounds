@@ -296,8 +296,10 @@ function isActiveMeeting(meeting: FellowMeeting, now: Date, leadMinutes: number)
   const duration = end.getTime() - start.getTime();
   if (duration <= 0 || duration > MAX_MEETING_DURATION_MS) return false;
 
-  const bufferedStart = start.getTime() - leadMinutes * 60 * 1000;
-  return now.getTime() >= bufferedStart && now.getTime() <= end.getTime();
+  const bufferMs = leadMinutes * 60 * 1000;
+  const bufferedStart = start.getTime() - bufferMs;
+  const bufferedEnd = end.getTime() + bufferMs;
+  return now.getTime() >= bufferedStart && now.getTime() <= bufferedEnd;
 }
 
 async function discoverFellowModuleCandidates(fileName: string): Promise<string[]> {
@@ -443,6 +445,12 @@ async function playCategory(category: SoundCategory, options?: { bypassDnd?: boo
   await playThemeCategory(config.theme, category, config.volume);
 }
 
+async function playRandomTestSound(): Promise<void> {
+  const category = pickRandom(SOUND_TEST_CATEGORIES);
+  if (!category) return;
+  await playCategory(category, { bypassDnd: true });
+}
+
 function looksDangerousBashCommand(command: string): boolean {
   const normalized = command.toLowerCase();
   return ["sudo ", "rm -rf", "git push", "gt submit", "chmod ", "chown ", "mv ", "gcloud auth", "gh auth"]
@@ -480,7 +488,7 @@ function formatDndStatus(config: SoundConfig, fellowActive: boolean, processActi
     `theme=${config.theme}`,
     `volume=${Math.round(config.volume * 100)}%`,
     `nightMute=${config.nightMuteEnabled ? "on" : "off"}${config.nightMuteEnabled ? ` (active=${isNightMuteActive(config) ? "yes" : "no"}, after=${formatHourLabel(config.muteAfterHour)})` : ""}`,
-    `fellowDnd=${config.fellowDndEnabled ? "on" : "off"}${config.fellowDndEnabled ? ` (active=${fellowActive ? "yes" : "no"}, lead=${config.fellowLeadMinutes}m, meetings=${lastFellowMeetingCount})` : ""}`,
+    `fellowDnd=${config.fellowDndEnabled ? "on" : "off"}${config.fellowDndEnabled ? ` (active=${fellowActive ? "yes" : "no"}, buffer=${config.fellowLeadMinutes}m, meetings=${lastFellowMeetingCount})` : ""}`,
     `meetingAppsDnd=${config.dndEnabled ? "on" : "off"}${config.dndEnabled ? ` (active=${processActive ? "yes" : "no"})` : ""}`,
     `fellowStatus=${lastFellowDndError ? `error: ${lastFellowDndError}` : "ok"}`,
     `fellowRefresh=${FELLOW_DND_CACHE_MS / 1000}s`,
@@ -491,7 +499,7 @@ type SoundsDashboardView = "main" | "theme" | "volume" | "lead" | "muteAfter" | 
 
 type MainDashboardAction = "theme" | "volume" | "enabled" | "dnd" | "lead" | "fellowDnd" | "processDnd" | "nightMute" | "muteAfter" | "test" | "status";
 
-const QUICK_VOLUME_STEPS = Array.from({ length: 11 }, (_unused, index) => index / 10);
+const QUICK_VOLUME_STEPS = Array.from({ length: 21 }, (_unused, index) => index / 20);
 const QUICK_LEAD_STEPS = [0, 1, 2, 5, 10];
 const QUICK_MUTE_AFTER_HOURS = Array.from({ length: 24 }, (_unused, hour) => hour);
 const MAX_SOUNDS_MENU_VISIBLE = 14;
@@ -526,17 +534,17 @@ function isRightInput(data: string, kb: { matches: (data: string, action: string
 
 function buildMainDashboardItems(config: SoundConfig, fellowActive: boolean, processActive: boolean): SelectItem[] {
   return [
-    { value: "theme", label: `Theme: ${config.theme}`, description: "Enter to browse themes • arrowing in the theme picker previews samples" },
-    { value: "volume", label: `Volume: ${Math.round(config.volume * 100)}%`, description: "←→ quick adjust • Enter for fixed steps" },
     { value: "enabled", label: `Sounds: ${config.enabled ? "on" : "off"}`, description: "Space toggles all sound effects" },
+    { value: "status", label: "Status", description: "Open live Fellow / DND diagnostics" },
+    { value: "volume", label: `Volume: ${Math.round(config.volume * 100)}%`, description: "←→ quick adjust • Enter for fixed steps" },
+    { value: "theme", label: `Theme: ${config.theme}`, description: "Enter to browse themes • arrowing in the theme picker previews samples" },
+    { value: "test", label: "Test sounds", description: "Space plays a random sound • Enter opens the sound tester" },
     { value: "dnd", label: `DND: ${config.dndEnabled || config.fellowDndEnabled || config.nightMuteEnabled ? "on" : "off"}`, description: "Space toggles all automatic muting" },
-    { value: "lead", label: `  ├─ Fellow lead time: ${config.fellowLeadMinutes}m`, description: "←→ quick adjust • Enter for fixed steps" },
     { value: "fellowDnd", label: `  ├─ Fellow DND: ${config.fellowDndEnabled ? "on" : "off"}`, description: `Fellow is ${fellowActive ? "currently active" : "currently idle"}` },
+    { value: "lead", label: `  ├─ Fellow buffer: ${config.fellowLeadMinutes}m`, description: "←→ quick adjust • Enter for fixed steps" },
     { value: "processDnd", label: `  ├─ Meeting Apps DND: ${config.dndEnabled ? "on" : "off"}`, description: `Meeting apps are ${processActive ? "currently active" : "currently idle"}` },
     { value: "nightMute", label: `  ├─ Night mute: ${config.nightMuteEnabled ? "on" : "off"}`, description: `Mute all sounds after ${formatHourLabel(config.muteAfterHour)}` },
     { value: "muteAfter", label: `  └─ Mute after: ${formatHourLabel(config.muteAfterHour)}`, description: "←→ quick adjust • Enter for hour picker" },
-    { value: "test", label: "Test sound", description: "Enter to open the tester • space previews in the test menu" },
-    { value: "status", label: "Status", description: "Open live Fellow / DND diagnostics" },
   ];
 }
 
@@ -645,6 +653,9 @@ async function showSoundsDashboard(ctx: any, config: SoundConfig, fellowActive: 
           await persistConfig({ ...currentConfig, muteAfterHour: nextHour }, true);
           return;
         }
+        case "test":
+          await playRandomTestSound();
+          return;
         default:
           return;
       }
@@ -730,7 +741,7 @@ async function showSoundsDashboard(ctx: any, config: SoundConfig, fellowActive: 
         const items = QUICK_LEAD_STEPS.map((step) => ({
           value: String(step),
           label: `${step}m`,
-          description: step === currentConfig.fellowLeadMinutes ? "Current Fellow lead time" : "Mute this many minutes before Fellow meetings",
+          description: step === currentConfig.fellowLeadMinutes ? "Current Fellow buffer" : "Mute this many minutes before and after Fellow meetings",
         }));
         selectList = new SelectList(items, Math.min(items.length, MAX_SOUNDS_MENU_VISIBLE), listTheme);
         leadIndex = Math.max(0, QUICK_LEAD_STEPS.findIndex((step) => step === currentConfig.fellowLeadMinutes));
@@ -792,6 +803,13 @@ async function showSoundsDashboard(ctx: any, config: SoundConfig, fellowActive: 
           label: category,
           description: `Preview '${category}' in the ${currentConfig.theme} theme`,
         }));
+        const previewSelectedTestSound = () => {
+          const category =
+            (selectList?.getSelectedItem()?.value as SoundCategory | undefined) ??
+            (items[testIndex]?.value as SoundCategory | undefined);
+          if (!category) return;
+          void playCategory(category, { bypassDnd: true });
+        };
         selectList = new SelectList(items, Math.min(items.length, MAX_SOUNDS_MENU_VISIBLE), listTheme);
         testIndex = Math.max(0, Math.min(testIndex, items.length - 1));
         selectList.setSelectedIndex(testIndex);
@@ -800,9 +818,7 @@ async function showSoundsDashboard(ctx: any, config: SoundConfig, fellowActive: 
           if (index >= 0) testIndex = index;
         };
         selectList.onSelect = () => {
-          const category = items[testIndex]?.value as SoundCategory | undefined;
-          if (!category) return;
-          void playCategory(category, { bypassDnd: true });
+          previewSelectedTestSound();
         };
         selectList.onCancel = () => {
           view = "main";
@@ -925,7 +941,12 @@ async function showSoundsDashboard(ctx: any, config: SoundConfig, fellowActive: 
         }
 
         if (view === "test" && data === " ") {
-          selectList?.onSelect?.(selectList.getSelectedItem() ?? { value: "", label: "" });
+          const category =
+            (selectList?.getSelectedItem()?.value as SoundCategory | undefined) ??
+            SOUND_TEST_CATEGORIES[testIndex];
+          if (category) {
+            void playCategory(category, { bypassDnd: true });
+          }
           return;
         }
 
