@@ -41,6 +41,12 @@ After that, open:
 - `/sounds`
 - `/sounds status`
 
+## Theme customization
+
+The `/sounds` dashboard includes a theme picker plus an assignment grid for previewing how each theme maps sounds to Pi hooks.
+
+![pi-sounds theme customization](./.github/pi-sounds-theme-customizations.png)
+
 ## Bundled assets
 
 This repo includes bundled sound themes under `themes/`.
