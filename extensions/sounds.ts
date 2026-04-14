@@ -191,6 +191,45 @@ function pickRandom<T>(items: T[]): T | null {
   return items[Math.floor(Math.random() * items.length)] ?? null;
 }
 
+function stripFileExtension(fileName: string): string {
+  return fileName.replace(/\.[^.]+$/, "");
+}
+
+function formatSoundLabel(fileName: string): string {
+  return stripFileExtension(fileName);
+}
+
+function formatThemeLabel(themeName: string): string {
+  const knownThemeLabels: Record<string, string> = {
+    aoe2: "Age of Empires II",
+    cnc: "Command & Conquer",
+    cod: "Call of Duty",
+    diablo2: "Diablo II",
+    halo: "Halo",
+    "league-of-legends": "League of Legends",
+    mario: "Mario",
+    mgs: "Metal Gear Solid",
+    "pokemon-gen3": "Pokemon Gen 3",
+    portal: "Portal",
+    "short-circuit": "Short Circuit",
+    "star-wars": "Star Wars",
+    starcraft: "StarCraft",
+    "wc3-peon": "Warcraft III Peon",
+    wh40k: "Warhammer 40K",
+    "zelda-botw": "The Legend of Zelda: Breath of the Wild",
+    "zelda-oot": "The Legend of Zelda: Ocarina of Time",
+  };
+
+  return (
+    knownThemeLabels[themeName] ??
+    themeName
+      .split(/[-_]+/)
+      .filter(Boolean)
+      .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+      .join(" ")
+  );
+}
+
 function isSoundCategory(value: string): value is SoundCategory {
   return [
     "start",
@@ -434,6 +473,42 @@ async function playThemePreview(theme: string, volume: number): Promise<void> {
   await playThemeCategory(theme, category, volume);
 }
 
+async function buildAssignSoundRows(theme: string): Promise<AssignSoundRow[]> {
+  const themeDir = await resolveThemeDir(theme);
+  const themeJson = await readTheme(theme);
+  if (!themeDir || !themeJson?.sounds) return [];
+
+  const rows = new Map<string, AssignSoundRow>();
+
+  for (const column of ASSIGN_SOUND_COLUMNS) {
+    const files = themeJson.sounds[column.key]?.files ?? [];
+    for (const file of files) {
+      const fileName = file.name?.trim();
+      if (!fileName) continue;
+
+      let row = rows.get(fileName);
+      if (!row) {
+        const previewPath = path.join(themeDir, "sounds", fileName);
+        row = {
+          fileName,
+          label: formatSoundLabel(fileName),
+          previewPath: (await pathExists(previewPath)) ? previewPath : null,
+          hooks: ASSIGN_SOUND_COLUMNS.map(() => false),
+        };
+        rows.set(fileName, row);
+      }
+
+      row.hooks[columnIndex(column.key)] = true;
+    }
+  }
+
+  return [...rows.values()];
+}
+
+function columnIndex(category: SoundCategory): number {
+  return Math.max(0, ASSIGN_SOUND_COLUMNS.findIndex((column) => column.key === category));
+}
+
 async function playCategory(category: SoundCategory, options?: { bypassDnd?: boolean }): Promise<void> {
   const config = await ensureConfig();
   if (!config.enabled) return;
@@ -499,6 +574,19 @@ type SoundsDashboardView = "main" | "theme" | "volume" | "lead" | "muteAfter" | 
 
 type MainDashboardAction = "theme" | "volume" | "enabled" | "dnd" | "lead" | "fellowDnd" | "processDnd" | "nightMute" | "muteAfter" | "test" | "status";
 
+type HookColumn = {
+  key: SoundCategory;
+  abbr: string;
+  description: string;
+};
+
+type AssignSoundRow = {
+  fileName: string;
+  label: string;
+  previewPath: string | null;
+  hooks: boolean[];
+};
+
 const QUICK_VOLUME_STEPS = Array.from({ length: 21 }, (_unused, index) => index / 20);
 const QUICK_LEAD_STEPS = [0, 1, 2, 5, 10];
 const QUICK_MUTE_AFTER_HOURS = Array.from({ length: 24 }, (_unused, hour) => hour);
@@ -513,6 +601,19 @@ const SOUND_TEST_CATEGORIES: SoundCategory[] = [
   "task-completed",
   "compact",
   "end",
+];
+const ASSIGN_SOUND_COLUMNS: HookColumn[] = [
+  { key: "start", abbr: "str", description: "Session starting" },
+  { key: "prompt", abbr: "pmt", description: "User submitted prompt" },
+  { key: "permission", abbr: "prm", description: "Permission prompt" },
+  { key: "stop", abbr: "stp", description: "Done responding" },
+  { key: "subagent", abbr: "sub", description: "Subagent starting" },
+  { key: "task-completed", abbr: "tsk", description: "Task completed" },
+  { key: "error", abbr: "err", description: "Tool failure" },
+  { key: "compact", abbr: "cmp", description: "Session compacting" },
+  { key: "idle", abbr: "idl", description: "Waiting for input" },
+  { key: "teammate-idle", abbr: "tmt", description: "Teammate went idle" },
+  { key: "end", abbr: "end", description: "Session ending" },
 ];
 
 function stepIndex<T>(items: T[], current: T, direction: -1 | 1): T {
@@ -532,17 +633,25 @@ function isRightInput(data: string, kb: { matches: (data: string, action: string
   return kb.matches(data, "tui.editor.cursorRight") || data === "\u001b[C" || data === "\u001bOC";
 }
 
+function isUpInput(data: string, kb: { matches: (data: string, action: string) => boolean }): boolean {
+  return kb.matches(data, "tui.editor.cursorUp") || kb.matches(data, "tui.select.prev") || data === "\u001b[A" || data === "\u001bOA";
+}
+
+function isDownInput(data: string, kb: { matches: (data: string, action: string) => boolean }): boolean {
+  return kb.matches(data, "tui.editor.cursorDown") || kb.matches(data, "tui.select.next") || data === "\u001b[B" || data === "\u001bOB";
+}
+
 function buildMainDashboardItems(config: SoundConfig, fellowActive: boolean, processActive: boolean): SelectItem[] {
   return [
     { value: "enabled", label: `Sounds: ${config.enabled ? "on" : "off"}`, description: "Space toggles all sound effects" },
     { value: "status", label: "Status", description: "Open live Fellow / DND diagnostics" },
     { value: "volume", label: `Volume: ${Math.round(config.volume * 100)}%`, description: "←→ quick adjust • Enter for fixed steps" },
-    { value: "theme", label: `Theme: ${config.theme}`, description: "Enter to browse themes • arrowing in the theme picker previews samples" },
-    { value: "test", label: "Test sounds", description: "Space plays a random sound • Enter opens the sound tester" },
+    { value: "theme", label: `Theme: ${formatThemeLabel(config.theme)}`, description: "Enter to browse themes • space previews • enter applies" },
+    { value: "test", label: "Assign sounds", description: "Space plays a random sound • Enter opens the sound assignment grid" },
     { value: "dnd", label: `DND: ${config.dndEnabled || config.fellowDndEnabled || config.nightMuteEnabled ? "on" : "off"}`, description: "Space toggles all automatic muting" },
     { value: "fellowDnd", label: `  ├─ Fellow DND: ${config.fellowDndEnabled ? "on" : "off"}`, description: `Fellow is ${fellowActive ? "currently active" : "currently idle"}` },
     { value: "lead", label: `  ├─ Fellow buffer: ${config.fellowLeadMinutes}m`, description: "←→ quick adjust • Enter for fixed steps" },
-    { value: "processDnd", label: `  ├─ Meeting Apps DND: ${config.dndEnabled ? "on" : "off"}`, description: `Meeting apps are ${processActive ? "currently active" : "currently idle"}` },
+    { value: "processDnd", label: `  ├─ Meeting apps DND: ${config.dndEnabled ? "on" : "off"}`, description: `Meeting apps are ${processActive ? "currently active" : "currently idle"}` },
     { value: "nightMute", label: `  ├─ Night mute: ${config.nightMuteEnabled ? "on" : "off"}`, description: `Mute all sounds after ${formatHourLabel(config.muteAfterHour)}` },
     { value: "muteAfter", label: `  └─ Mute after: ${formatHourLabel(config.muteAfterHour)}`, description: "←→ quick adjust • Enter for hour picker" },
   ];
@@ -559,7 +668,12 @@ async function showSoundsDashboard(ctx: any, config: SoundConfig, fellowActive: 
     let volumeIndex = Math.max(0, QUICK_VOLUME_STEPS.findIndex((step) => step === currentConfig.volume));
     let leadIndex = Math.max(0, QUICK_LEAD_STEPS.findIndex((step) => step === currentConfig.fellowLeadMinutes));
     let muteAfterIndex = Math.max(0, QUICK_MUTE_AFTER_HOURS.findIndex((hour) => hour === currentConfig.muteAfterHour));
-    let testIndex = 0;
+    let assignRows: AssignSoundRow[] = [];
+    let assignCursorRow = 0;
+    let assignCursorCol = 0;
+    let assignScrollTop = 0;
+    let assignError: string | null = null;
+    let assignLoading = false;
     let selectList: SelectList | null = null;
 
     const listTheme = {
@@ -571,16 +685,16 @@ async function showSoundsDashboard(ctx: any, config: SoundConfig, fellowActive: 
     };
 
     const currentSummary = () =>
-      `Theme ${currentConfig.theme} • Volume ${Math.round(currentConfig.volume * 100)}% • Fellow ${currentFellowActive ? "active" : "idle"} • Process ${currentProcessActive ? "active" : "idle"}`;
+      `Theme ${formatThemeLabel(currentConfig.theme)} • Volume ${Math.round(currentConfig.volume * 100)}% • Fellow ${currentFellowActive ? "active" : "idle"} • Process ${currentProcessActive ? "active" : "idle"}`;
 
     const currentHelp = () => {
       switch (view) {
         case "main":
           return "↑↓ move • space toggle • ←→ quick adjust • enter menu • esc close";
         case "theme":
-          return "↑↓ browse + preview • space preview • enter choose • esc back";
+          return "↑↓ browse • space preview • enter preview + choose • esc back";
         case "test":
-          return "↑↓ choose sound • space preview • enter preview • esc back";
+          return "↑↓ sounds • ←→ hooks • space/enter/p preview • esc back";
         case "volume":
         case "lead":
         case "muteAfter":
@@ -798,33 +912,23 @@ async function showSoundsDashboard(ctx: any, config: SoundConfig, fellowActive: 
       }
 
       if (view === "test") {
-        const items = SOUND_TEST_CATEGORIES.map((category) => ({
-          value: category,
-          label: category,
-          description: `Preview '${category}' in the ${currentConfig.theme} theme`,
-        }));
-        const previewSelectedTestSound = () => {
-          const category =
-            (selectList?.getSelectedItem()?.value as SoundCategory | undefined) ??
-            (items[testIndex]?.value as SoundCategory | undefined);
-          if (!category) return;
-          void playCategory(category, { bypassDnd: true });
-        };
-        selectList = new SelectList(items, Math.min(items.length, MAX_SOUNDS_MENU_VISIBLE), listTheme);
-        testIndex = Math.max(0, Math.min(testIndex, items.length - 1));
-        selectList.setSelectedIndex(testIndex);
-        selectList.onSelectionChange = (item) => {
-          const index = items.findIndex((candidate) => candidate.value === item.value);
-          if (index >= 0) testIndex = index;
-        };
-        selectList.onSelect = () => {
-          previewSelectedTestSound();
-        };
-        selectList.onCancel = () => {
-          view = "main";
-          rebuildList();
-          tui.requestRender();
-        };
+        selectList = null;
+        assignLoading = true;
+        assignError = null;
+        assignRows = [];
+        void (async () => {
+          try {
+            assignRows = await buildAssignSoundRows(currentConfig.theme);
+            assignCursorRow = Math.max(0, Math.min(assignCursorRow, Math.max(0, assignRows.length - 1)));
+            assignCursorCol = Math.max(0, Math.min(assignCursorCol, ASSIGN_SOUND_COLUMNS.length - 1));
+            assignScrollTop = Math.max(0, Math.min(assignScrollTop, Math.max(0, assignRows.length - 1)));
+          } catch (error) {
+            assignError = error instanceof Error ? error.message : String(error);
+          } finally {
+            assignLoading = false;
+            tui.requestRender();
+          }
+        })();
         return;
       }
 
@@ -842,8 +946,8 @@ async function showSoundsDashboard(ctx: any, config: SoundConfig, fellowActive: 
 
           const items = themes.map((themeName) => ({
             value: themeName,
-            label: themeName,
-            description: themeName === currentConfig.theme ? "Current theme" : "Preview with arrow keys or space",
+            label: formatThemeLabel(themeName),
+            description: themeName === currentConfig.theme ? "Current theme" : "Space previews • Enter applies",
           }));
           selectList = new SelectList(items, Math.min(items.length, MAX_SOUNDS_MENU_VISIBLE), listTheme);
           themeIndex = Math.max(0, themes.indexOf(currentConfig.theme));
@@ -851,12 +955,12 @@ async function showSoundsDashboard(ctx: any, config: SoundConfig, fellowActive: 
           selectList.onSelectionChange = (item) => {
             const index = items.findIndex((candidate) => candidate.value === item.value);
             if (index >= 0) themeIndex = index;
-            void playThemePreview(item.value, currentConfig.volume);
           };
           selectList.onSelect = () => {
             const themeName = items[themeIndex]?.value;
             if (!themeName) return;
             void (async () => {
+              await playThemePreview(themeName, currentConfig.volume);
               await persistConfig({ ...currentConfig, theme: themeName });
               view = "main";
               rebuildList();
@@ -876,6 +980,105 @@ async function showSoundsDashboard(ctx: any, config: SoundConfig, fellowActive: 
       selectList = null;
     };
 
+    const previewAssignSound = () => {
+      const row = assignRows[assignCursorRow];
+      if (!row?.previewPath) return;
+      void playSoundFile(row.previewPath, currentConfig.volume);
+    };
+
+    const renderAssignSoundGrid = (width: number): string[] => {
+      if (assignLoading) {
+        return [theme.fg("muted", "Loading sound assignment grid…")];
+      }
+
+      if (assignError) {
+        return [theme.fg("warning", `Unable to load sound assignments: ${assignError}`)];
+      }
+
+      if (assignRows.length === 0) {
+        return [theme.fg("muted", `No assigned sounds found for ${formatThemeLabel(currentConfig.theme)}.`)];
+      }
+
+      const colWidth = 4;
+      let labelWidth = Math.min(30, Math.max(18, width - 24));
+      const linePrefix = 2;
+      const totalCols = ASSIGN_SOUND_COLUMNS.length;
+      const visibleCols = Math.max(1, Math.min(totalCols, Math.floor((width - linePrefix - labelWidth - 2) / colWidth)));
+      const needsHScroll = visibleCols < totalCols;
+
+      if (assignCursorCol < 0) assignCursorCol = 0;
+      if (assignCursorCol >= totalCols) assignCursorCol = totalCols - 1;
+      if (assignCursorRow < 0) assignCursorRow = 0;
+      if (assignCursorRow >= assignRows.length) assignCursorRow = assignRows.length - 1;
+
+      let colStart = 0;
+      if (needsHScroll) {
+        colStart = Math.max(0, Math.min(assignCursorCol - Math.floor(visibleCols / 2), totalCols - visibleCols));
+      }
+      const showLeftArrow = needsHScroll && colStart > 0;
+      const showRightArrow = needsHScroll && colStart + visibleCols < totalCols;
+      const leftMargin = needsHScroll ? (showLeftArrow ? theme.fg("dim", "◂") : " ") : "";
+      const rightMargin = needsHScroll ? (showRightArrow ? theme.fg("dim", "▸") : " ") : "";
+
+      const maxVisibleRows = 10;
+      if (assignCursorRow < assignScrollTop) assignScrollTop = assignCursorRow;
+      if (assignCursorRow >= assignScrollTop + maxVisibleRows) assignScrollTop = assignCursorRow - maxVisibleRows + 1;
+      assignScrollTop = Math.max(0, Math.min(assignScrollTop, Math.max(0, assignRows.length - maxVisibleRows)));
+
+      const lines: string[] = [];
+      const sectionLabel = `── ${formatThemeLabel(currentConfig.theme)} ─`;
+      lines.push(theme.fg("dim", sectionLabel.padEnd(Math.max(sectionLabel.length, width - 2), "─")));
+
+      let headerLine = " ".repeat(labelWidth) + leftMargin;
+      for (let column = colStart; column < colStart + visibleCols; column++) {
+        const abbr = ASSIGN_SOUND_COLUMNS[column]?.abbr ?? "";
+        const cell = abbr.padStart(colWidth);
+        headerLine += column === assignCursorCol ? theme.fg("accent", theme.bold(cell)) : theme.fg("dim", cell);
+      }
+      headerLine += rightMargin;
+      lines.push(headerLine);
+
+      const visibleRows = assignRows.slice(assignScrollTop, assignScrollTop + maxVisibleRows);
+      for (let index = 0; index < visibleRows.length; index++) {
+        const absoluteIndex = assignScrollTop + index;
+        const row = visibleRows[index];
+        const isActiveRow = absoluteIndex === assignCursorRow;
+        const pointer = isActiveRow ? theme.fg("accent", "›") : " ";
+        const rawLabel = row.label.length > labelWidth - 3 ? `${row.label.slice(0, labelWidth - 4)}…` : row.label;
+        let line = `${pointer} ${isActiveRow ? theme.fg("accent", rawLabel.padEnd(labelWidth - 2, " ")) : theme.fg("muted", rawLabel.padEnd(labelWidth - 2, " "))}${leftMargin}`;
+
+        for (let column = colStart; column < colStart + visibleCols; column++) {
+          const isChecked = row.hooks[column];
+          const isActiveCell = isActiveRow && column === assignCursorCol;
+          const cellText = isChecked ? "[x]" : "[ ]";
+          if (isActiveCell) {
+            line += theme.fg("accent", theme.bold(` ${cellText}`));
+          } else if (isChecked) {
+            line += theme.fg("accent", ` ${cellText}`);
+          } else {
+            line += theme.fg("dim", ` ${cellText}`);
+          }
+        }
+        line += rightMargin;
+        lines.push(line);
+      }
+
+      if (assignRows.length > maxVisibleRows) {
+        lines.push(theme.fg("dim", `${assignCursorRow + 1}/${assignRows.length} sounds`));
+      }
+
+      const currentHook = ASSIGN_SOUND_COLUMNS[assignCursorCol];
+      const currentRow = assignRows[assignCursorRow];
+      if (currentRow) {
+        lines.push(theme.fg("muted", `Sound: ${currentRow.fileName}`));
+      }
+      if (currentHook) {
+        lines.push(theme.fg("muted", `Hook: ${currentHook.key} — ${currentHook.description}`));
+      }
+
+      return lines;
+    };
+
     void refreshPresence().then(() => {
       rebuildList();
       tui.requestRender();
@@ -892,6 +1095,9 @@ async function showSoundsDashboard(ctx: any, config: SoundConfig, fellowActive: 
 
         if (view === "status") {
           lines.push(...formatDndStatus(currentConfig, currentFellowActive, currentProcessActive).split("\n").map((line) => theme.fg("muted", line)));
+        } else if (view === "test") {
+          lines.push(theme.fg("accent", "Assign sounds to hooks"));
+          lines.push(...renderAssignSoundGrid(width));
         } else if (selectList) {
           lines.push(...selectList.render(width));
         }
@@ -940,12 +1146,40 @@ async function showSoundsDashboard(ctx: any, config: SoundConfig, fellowActive: 
           return;
         }
 
-        if (view === "test" && data === " ") {
-          const category =
-            (selectList?.getSelectedItem()?.value as SoundCategory | undefined) ??
-            SOUND_TEST_CATEGORIES[testIndex];
-          if (category) {
-            void playCategory(category, { bypassDnd: true });
+        if (view === "test") {
+          if (kb.matches(data, "tui.select.cancel")) {
+            view = "main";
+            rebuildList();
+            tui.requestRender();
+            return;
+          }
+          if (kb.matches(data, "tui.select.confirm") || data === " ") {
+            previewAssignSound();
+            return;
+          }
+          if (isLeftInput(data, kb)) {
+            assignCursorCol = Math.max(0, assignCursorCol - 1);
+            tui.requestRender();
+            return;
+          }
+          if (isRightInput(data, kb)) {
+            assignCursorCol = Math.min(ASSIGN_SOUND_COLUMNS.length - 1, assignCursorCol + 1);
+            tui.requestRender();
+            return;
+          }
+          if (isUpInput(data, kb)) {
+            assignCursorRow = Math.max(0, assignCursorRow - 1);
+            tui.requestRender();
+            return;
+          }
+          if (isDownInput(data, kb)) {
+            assignCursorRow = Math.min(Math.max(0, assignRows.length - 1), assignCursorRow + 1);
+            tui.requestRender();
+            return;
+          }
+          if (data.toLowerCase() === "p") {
+            previewAssignSound();
+            return;
           }
           return;
         }

@@ -45,6 +45,26 @@ After that, open:
 
 This repo includes bundled sound themes under `themes/`.
 
+Bundled theme options:
+
+- `aoe2` — Age of Empires II
+- `cnc` — Command & Conquer
+- `cod` — Call of Duty
+- `diablo2` — Diablo II
+- `halo` — Halo
+- `league-of-legends` — League of Legends
+- `mario` — Mario
+- `mgs` — Metal Gear Solid
+- `pokemon-gen3` — Pokemon Gen 3
+- `portal` — Portal
+- `short-circuit` — Short Circuit
+- `star-wars` — Star Wars
+- `starcraft` — StarCraft
+- `wc3-peon` — Warcraft III Peon
+- `wh40k` — Warhammer 40K
+- `zelda-botw` — The Legend of Zelda: Breath of the Wild
+- `zelda-oot` — The Legend of Zelda: Ocarina of Time
+
 The extension uses:
 1. user themes in `~/.pi/sounds/themes/` when present
 2. bundled themes from this repo otherwise
