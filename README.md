@@ -18,23 +18,21 @@ It adapts the ideas and theme assets from [`ryparker/claude-code-sounds`](https:
 
 ## Install
 
-From GitHub:
+Either:
 
-```bash
-pi install https://github.com/cammcnab/pi-sounds
-```
+- Paste this into Pi:
 
-From a local checkout during development:
+  ```text
+  Install this extension: https://github.com/cammcnab/pi-sounds
+  ```
 
-```bash
-pi install /path/to/pi-sounds
-```
+  Then run `/reload`.
 
-Then reload Pi:
+- Or run this in your terminal, then launch Pi:
 
-```text
-/reload
-```
+  ```bash
+  pi install https://github.com/cammcnab/pi-sounds
+  ```
 
 After that, open:
 
