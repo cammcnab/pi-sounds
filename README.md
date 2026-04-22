@@ -13,7 +13,7 @@ It adapts the ideas and theme assets from [`ryparker/claude-code-sounds`](https:
 - `/sounds status` for quick diagnostics
 - do-not-disturb support for:
   - meeting apps (`zoom.us`, `Zoom`, `Microsoft Teams`, `Teams`, `Webex`, `FaceTime`)
-  - Fellow meeting integration when available
+  - Google Workspace or Fellow meeting integration when available
   - night mute after a chosen hour
 
 ## Install
@@ -80,7 +80,7 @@ Runtime config is stored in:
 ## Notes
 
 - Playback currently uses macOS `afplay`.
-- Meeting-aware DND is optional; Fellow support is used only when it is already available in Pi.
+- Meeting-aware DND is optional; `pi-sounds` will use Google Workspace or Fellow when either one is already available in Pi.
 
 ## License
 
