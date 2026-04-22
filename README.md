@@ -12,7 +12,7 @@ It adapts the ideas and theme assets from [`ryparker/claude-code-sounds`](https:
 - `/sounds` dashboard for settings and previews
 - `/sounds status` for quick diagnostics
 - do-not-disturb support for:
-  - meeting apps (`zoom.us`, `Zoom`, `Microsoft Teams`, `Teams`, `Webex`, `FaceTime`)
+  - meeting apps (Zoom, Teams, Webex, FaceTime)
   - Google Workspace or Fellow meeting integration when available
   - night mute after a chosen hour
 
