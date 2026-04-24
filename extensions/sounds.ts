@@ -58,6 +58,8 @@ type SoundCategory =
 type ThemeJson = {
   name?: string;
   description?: string;
+  author?: string;
+  sources?: string[];
   sounds?: Partial<Record<SoundCategory, { description?: string; files?: Array<{ name?: string }> }>>;
 };
 
@@ -196,25 +198,101 @@ async function listInstalledThemes(): Promise<string[]> {
   return [...names].sort();
 }
 
-async function resolveThemeDir(theme: string): Promise<string | null> {
+async function resolveThemeDirs(theme: string): Promise<string[]> {
+  const dirs: string[] = [];
   for (const themesDir of THEME_SEARCH_DIRS) {
     const themeDir = path.join(themesDir, theme);
     if (await pathExists(path.join(themeDir, "theme.json"))) {
-      return themeDir;
+      dirs.push(themeDir);
     }
   }
-  return null;
+  return dirs;
 }
 
-async function readTheme(theme: string): Promise<ThemeJson | null> {
+async function resolveThemeDir(theme: string): Promise<string | null> {
+  const dirs = await resolveThemeDirs(theme);
+  return dirs[0] ?? null;
+}
+
+async function readThemeFile(themeDir: string): Promise<ThemeJson | null> {
   try {
-    const themeDir = await resolveThemeDir(theme);
-    if (!themeDir) return null;
     const raw = await fs.readFile(path.join(themeDir, "theme.json"), "utf8");
     return JSON.parse(raw) as ThemeJson;
   } catch {
     return null;
   }
+}
+
+function mergeThemeJson(base: ThemeJson | null, override: ThemeJson | null): ThemeJson | null {
+  if (!base && !override) return null;
+  if (!base) return override;
+  if (!override) return base;
+
+  const mergedSounds: NonNullable<ThemeJson["sounds"]> = { ...(base.sounds ?? {}) };
+  for (const [category, value] of Object.entries(override.sounds ?? {})) {
+    if (!value || !isSoundCategory(category)) continue;
+    mergedSounds[category] = {
+      ...(mergedSounds[category] ?? {}),
+      ...value,
+      files: value.files ? value.files.map((file) => ({ name: file.name })) : mergedSounds[category]?.files,
+    };
+  }
+
+  return {
+    ...base,
+    ...override,
+    sounds: mergedSounds,
+  };
+}
+
+async function readTheme(theme: string): Promise<ThemeJson | null> {
+  try {
+    const themeDirs = await resolveThemeDirs(theme);
+    let merged: ThemeJson | null = null;
+
+    for (const themeDir of [...themeDirs].reverse()) {
+      merged = mergeThemeJson(merged, await readThemeFile(themeDir));
+    }
+
+    return merged;
+  } catch {
+    return null;
+  }
+}
+
+async function resolveThemeSoundFile(theme: string, fileName: string): Promise<string | null> {
+  const themeDirs = await resolveThemeDirs(theme);
+  for (const themeDir of themeDirs) {
+    const filePath = path.join(themeDir, "sounds", fileName);
+    if (await pathExists(filePath)) {
+      return filePath;
+    }
+  }
+  return null;
+}
+
+async function listThemeSoundFiles(theme: string): Promise<string[]> {
+  const fileNames = new Set<string>();
+  const themeDirs = await resolveThemeDirs(theme);
+
+  for (const themeDir of themeDirs) {
+    try {
+      const entries = await fs.readdir(path.join(themeDir, "sounds"), { withFileTypes: true });
+      for (const entry of entries) {
+        if (entry.isFile()) fileNames.add(entry.name);
+      }
+    } catch {
+      // ignore missing sounds directories
+    }
+  }
+
+  return [...fileNames].sort();
+}
+
+async function saveThemeOverride(theme: string, themeJson: ThemeJson): Promise<void> {
+  const themeDir = path.join(THEMES_DIR, theme);
+  await fs.mkdir(themeDir, { recursive: true });
+  await fs.writeFile(path.join(themeDir, "theme.json"), `${JSON.stringify(themeJson, null, 2)}\n`, "utf8");
 }
 
 function pickRandom<T>(items: T[]): T | null {
@@ -278,16 +356,12 @@ function isSoundCategory(value: string): value is SoundCategory {
 }
 
 async function resolveSoundFile(theme: string, category: SoundCategory): Promise<string | null> {
-  const themeDir = await resolveThemeDir(theme);
-  if (!themeDir) return null;
-
   const themeJson = await readTheme(theme);
   const candidates = themeJson?.sounds?.[category]?.files?.map((file) => file.name).filter(Boolean) as string[] | undefined;
   const picked = pickRandom(candidates ?? []);
   if (!picked) return null;
 
-  const filePath = path.join(themeDir, "sounds", picked);
-  return (await pathExists(filePath)) ? filePath : null;
+  return resolveThemeSoundFile(theme, picked);
 }
 
 function execFileText(command: string, args: string[]): Promise<string> {
@@ -701,25 +775,30 @@ async function playThemePreview(theme: string, volume: number): Promise<void> {
 }
 
 async function buildAssignSoundRows(theme: string): Promise<AssignSoundRow[]> {
-  const themeDir = await resolveThemeDir(theme);
   const themeJson = await readTheme(theme);
-  if (!themeDir || !themeJson?.sounds) return [];
-
   const rows = new Map<string, AssignSoundRow>();
 
+  for (const fileName of await listThemeSoundFiles(theme)) {
+    rows.set(fileName, {
+      fileName,
+      label: formatSoundLabel(fileName),
+      previewPath: await resolveThemeSoundFile(theme, fileName),
+      hooks: ASSIGN_SOUND_COLUMNS.map(() => false),
+    });
+  }
+
   for (const column of ASSIGN_SOUND_COLUMNS) {
-    const files = themeJson.sounds[column.key]?.files ?? [];
+    const files = themeJson?.sounds?.[column.key]?.files ?? [];
     for (const file of files) {
       const fileName = file.name?.trim();
       if (!fileName) continue;
 
       let row = rows.get(fileName);
       if (!row) {
-        const previewPath = path.join(themeDir, "sounds", fileName);
         row = {
           fileName,
           label: formatSoundLabel(fileName),
-          previewPath: (await pathExists(previewPath)) ? previewPath : null,
+          previewPath: await resolveThemeSoundFile(theme, fileName),
           hooks: ASSIGN_SOUND_COLUMNS.map(() => false),
         };
         rows.set(fileName, row);
@@ -900,17 +979,17 @@ function isDownInput(data: string, kb: { matches: (data: string, action: string)
 
 function buildMainDashboardItems(config: SoundConfig, meetingActive: boolean, processActive: boolean): SelectItem[] {
   return [
-    { value: "enabled", label: `Sounds: ${config.enabled ? "on" : "off"}`, description: "Space toggles all sound effects" },
-    { value: "status", label: "Status", description: "Open live meeting / DND diagnostics" },
-    { value: "volume", label: `Volume: ${Math.round(config.volume * 100)}%`, description: "←→ quick adjust • Enter for fixed steps" },
-    { value: "theme", label: `Theme: ${formatThemeLabel(config.theme)}`, description: "Enter to browse themes • space previews • enter applies" },
-    { value: "test", label: "Assign sounds", description: "Space plays a random sound • Enter opens the sound assignment grid" },
-    { value: "dnd", label: `DND: ${config.dndEnabled || config.fellowDndEnabled || config.nightMuteEnabled ? "on" : "off"}`, description: "Space toggles all automatic muting" },
-    { value: "fellowDnd", label: `  ├─ Meeting DND: ${config.fellowDndEnabled ? "on" : "off"}`, description: `Meetings are ${meetingActive ? "currently active" : "currently idle"}` },
-    { value: "lead", label: `  ├─ Meeting buffer: ${config.fellowLeadMinutes}m`, description: "←→ quick adjust • Enter for fixed steps" },
-    { value: "processDnd", label: `  ├─ Meeting apps DND: ${config.dndEnabled ? "on" : "off"}`, description: `${processActive ? "Active now • " : ""}Watches ${formatMeetingAppsSupport(config.dndProcesses)}` },
-    { value: "nightMute", label: `  ├─ Night mute: ${config.nightMuteEnabled ? "on" : "off"}`, description: `Mute all sounds after ${formatHourLabel(config.muteAfterHour)}` },
-    { value: "muteAfter", label: `  └─ Mute after: ${formatHourLabel(config.muteAfterHour)}`, description: "←→ quick adjust • Enter for hour picker" },
+    { value: "enabled", label: `Sounds: ${config.enabled ? "on" : "off"}`, description: "Space: Toggle all sound effects" },
+    { value: "status", label: "Status", description: "Enter: Open live meeting / DND diagnostics" },
+    { value: "volume", label: `Volume: ${Math.round(config.volume * 100)}%`, description: "←→: Adjust quickly • Enter: Choose a fixed value" },
+    { value: "theme", label: `Theme: ${formatThemeLabel(config.theme)}`, description: "Enter: Browse themes • Space: Preview current theme" },
+    { value: "test", label: "Assign sounds", description: "Enter: Open the assignment grid • Space: Play a random sound" },
+    { value: "dnd", label: `DND: ${config.dndEnabled || config.fellowDndEnabled || config.nightMuteEnabled ? "on" : "off"}`, description: "Space: Toggle all automatic muting" },
+    { value: "fellowDnd", label: `  ├─ Meeting DND: ${config.fellowDndEnabled ? "on" : "off"}`, description: `Space: Toggle meeting muting • Status: ${meetingActive ? "active" : "idle"}` },
+    { value: "lead", label: `  ├─ Meeting buffer: ${config.fellowLeadMinutes}m`, description: "←→: Adjust quickly • Enter: Choose a buffer" },
+    { value: "processDnd", label: `  ├─ Meeting apps DND: ${config.dndEnabled ? "on" : "off"}`, description: `${processActive ? "Space: Toggle • Status: Active now • " : "Space: Toggle • "}Watches ${formatMeetingAppsSupport(config.dndProcesses)}` },
+    { value: "nightMute", label: `  ├─ Night mute: ${config.nightMuteEnabled ? "on" : "off"}`, description: `Space: Toggle • Mutes all sounds after ${formatHourLabel(config.muteAfterHour)}` },
+    { value: "muteAfter", label: `  └─ Mute after: ${formatHourLabel(config.muteAfterHour)}`, description: "←→: Adjust quickly • Enter: Choose an hour" },
   ];
 }
 
@@ -926,6 +1005,8 @@ async function showSoundsDashboard(ctx: any, config: SoundConfig, meetingActive:
     let leadIndex = Math.max(0, QUICK_LEAD_STEPS.findIndex((step) => step === currentConfig.fellowLeadMinutes));
     let muteAfterIndex = Math.max(0, QUICK_MUTE_AFTER_HOURS.findIndex((hour) => hour === currentConfig.muteAfterHour));
     let assignRows: AssignSoundRow[] = [];
+    let assignThemeDraft: ThemeJson | null = null;
+    let assignDirty = false;
     let assignCursorRow = 0;
     let assignCursorCol = 0;
     let assignScrollTop = 0;
@@ -951,7 +1032,7 @@ async function showSoundsDashboard(ctx: any, config: SoundConfig, meetingActive:
         case "theme":
           return "↑↓ browse • space preview • enter preview + choose • esc back";
         case "test":
-          return "↑↓ sounds • ←→ hooks • space/enter/p preview • esc back";
+          return "↑↓ sounds • ←→ hooks • enter toggle assignment • space preview • esc save + back";
         case "volume":
         case "lead":
         case "muteAfter":
@@ -1004,6 +1085,9 @@ async function showSoundsDashboard(ctx: any, config: SoundConfig, meetingActive:
           return;
         case "nightMute":
           await persistConfig({ ...currentConfig, nightMuteEnabled: !currentConfig.nightMuteEnabled }, true);
+          return;
+        case "theme":
+          await playThemePreview(currentConfig.theme, currentConfig.volume);
           return;
         case "volume": {
           if (!direction) return;
@@ -1173,8 +1257,10 @@ async function showSoundsDashboard(ctx: any, config: SoundConfig, meetingActive:
         assignLoading = true;
         assignError = null;
         assignRows = [];
+        assignDirty = false;
         void (async () => {
           try {
+            assignThemeDraft = await readTheme(currentConfig.theme);
             assignRows = await buildAssignSoundRows(currentConfig.theme);
             assignCursorRow = Math.max(0, Math.min(assignCursorRow, Math.max(0, assignRows.length - 1)));
             assignCursorCol = Math.max(0, Math.min(assignCursorCol, ASSIGN_SOUND_COLUMNS.length - 1));
@@ -1243,6 +1329,45 @@ async function showSoundsDashboard(ctx: any, config: SoundConfig, meetingActive:
       void playSoundFile(row.previewPath, currentConfig.volume);
     };
 
+    const toggleAssignSound = () => {
+      const row = assignRows[assignCursorRow];
+      const hook = ASSIGN_SOUND_COLUMNS[assignCursorCol];
+      if (!row || !hook) return;
+
+      assignThemeDraft ??= { sounds: {} };
+      assignThemeDraft.sounds ??= {};
+
+      const existingEntry = assignThemeDraft.sounds[hook.key] ?? {};
+      const existingFiles = (existingEntry.files ?? [])
+        .map((file) => file.name?.trim())
+        .filter((name): name is string => Boolean(name));
+      const isAssigned = existingFiles.includes(row.fileName);
+      const nextFiles = isAssigned ? existingFiles.filter((name) => name !== row.fileName) : [...existingFiles, row.fileName];
+
+      assignThemeDraft.sounds[hook.key] = {
+        ...existingEntry,
+        files: nextFiles.map((name) => ({ name })),
+      };
+      row.hooks[assignCursorCol] = !isAssigned;
+      assignDirty = true;
+      assignError = null;
+      tui.requestRender();
+    };
+
+    const saveAssignChanges = async (): Promise<boolean> => {
+      if (!assignDirty || !assignThemeDraft) return true;
+
+      try {
+        await saveThemeOverride(currentConfig.theme, assignThemeDraft);
+        assignDirty = false;
+        return true;
+      } catch (error) {
+        assignError = error instanceof Error ? error.message : String(error);
+        tui.requestRender();
+        return false;
+      }
+    };
+
     const renderAssignSoundGrid = (width: number): string[] => {
       if (assignLoading) {
         return [theme.fg("muted", "Loading sound assignment grid…")];
@@ -1253,7 +1378,7 @@ async function showSoundsDashboard(ctx: any, config: SoundConfig, meetingActive:
       }
 
       if (assignRows.length === 0) {
-        return [theme.fg("muted", `No assigned sounds found for ${formatThemeLabel(currentConfig.theme)}.`)];
+        return [theme.fg("muted", `No sounds found for ${formatThemeLabel(currentConfig.theme)}.`)];
       }
 
       const colWidth = 4;
@@ -1332,6 +1457,9 @@ async function showSoundsDashboard(ctx: any, config: SoundConfig, meetingActive:
       if (currentHook) {
         lines.push(theme.fg("muted", `Hook: ${currentHook.key} — ${currentHook.description}`));
       }
+      if (assignDirty) {
+        lines.push(theme.fg("warning", "Unsaved assignment changes"));
+      }
 
       return lines;
     };
@@ -1405,12 +1533,20 @@ async function showSoundsDashboard(ctx: any, config: SoundConfig, meetingActive:
 
         if (view === "test") {
           if (kb.matches(data, "tui.select.cancel")) {
-            view = "main";
-            rebuildList();
-            tui.requestRender();
+            void (async () => {
+              if (await saveAssignChanges()) {
+                view = "main";
+                rebuildList();
+                tui.requestRender();
+              }
+            })();
             return;
           }
-          if (kb.matches(data, "tui.select.confirm") || data === " ") {
+          if (kb.matches(data, "tui.select.confirm")) {
+            toggleAssignSound();
+            return;
+          }
+          if (data === " ") {
             previewAssignSound();
             return;
           }
