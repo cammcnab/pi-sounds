@@ -25,8 +25,7 @@
       "files": [
         { "name": "hitmarker.mp3" },
         { "name": "tango-down.mp3" },
-        { "name": "enemy-downed.mp3" },
-        { "name": "hitmarker-alt.mp3" }
+        { "name": "enemy-downed.mp3" }
       ]
     },
     "stop": {
