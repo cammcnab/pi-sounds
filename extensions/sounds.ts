@@ -1,6 +1,10 @@
-import type { ExtensionAPI } from "@mariozechner/pi-coding-agent";
-import { DynamicBorder } from "@mariozechner/pi-coding-agent";
-import { Container, SelectList, type SelectItem } from "@mariozechner/pi-tui";
+import {
+  DynamicBorder,
+  Container,
+  SelectList,
+  type ExtensionAPI,
+  type SelectItem,
+} from "./pi-deps.ts";
 import { promises as fs } from "node:fs";
 import os from "node:os";
 import path from "node:path";
@@ -108,6 +112,7 @@ const MIN_PLAY_GAP_MS = 150;
 const DND_CACHE_MS = 10000;
 const FELLOW_DND_CACHE_MS = 15000;
 const MAX_MEETING_DURATION_MS = 6 * 60 * 60 * 1000;
+const NIGHT_MUTE_UNTIL_HOUR = 7;
 
 let lastPlayAt = 0;
 let lastDndCheckAt = 0;
@@ -726,9 +731,15 @@ function formatHourLabel(hour24: number): string {
   return `${hour12}${suffix}`;
 }
 
+function isHourInMuteWindow(hour: number, startHour: number, endHour: number): boolean {
+  if (startHour === endHour) return true;
+  if (startHour < endHour) return hour >= startHour && hour < endHour;
+  return hour >= startHour || hour < endHour;
+}
+
 function isNightMuteActive(config: SoundConfig, now = new Date()): boolean {
   if (!config.nightMuteEnabled) return false;
-  return now.getHours() >= config.muteAfterHour;
+  return isHourInMuteWindow(now.getHours(), config.muteAfterHour, NIGHT_MUTE_UNTIL_HOUR);
 }
 
 async function isDndActive(config: SoundConfig): Promise<boolean> {
@@ -868,7 +879,7 @@ function formatDndStatus(config: SoundConfig, meetingActive: boolean, processAct
   return [
     `theme=${config.theme}`,
     `volume=${Math.round(config.volume * 100)}%`,
-    `nightMute=${config.nightMuteEnabled ? "on" : "off"}${config.nightMuteEnabled ? ` (active=${isNightMuteActive(config) ? "yes" : "no"}, after=${formatHourLabel(config.muteAfterHour)})` : ""}`,
+    `nightMute=${config.nightMuteEnabled ? "on" : "off"}${config.nightMuteEnabled ? ` (active=${isNightMuteActive(config) ? "yes" : "no"}, from=${formatHourLabel(config.muteAfterHour)}, until=${formatHourLabel(NIGHT_MUTE_UNTIL_HOUR)})` : ""}`,
     `meetingDnd=${config.fellowDndEnabled ? "on" : "off"}${config.fellowDndEnabled ? ` (active=${meetingActive ? "yes" : "no"}, buffer=${config.fellowLeadMinutes}m)` : ""}`,
     `meetingAppsDnd=${config.dndEnabled ? "on" : "off"}${config.dndEnabled ? ` (active=${processActive ? "yes" : "no"})` : ""}`,
     `gworkspace=${!lastGworkspaceAvailable ? "unavailable" : lastGworkspaceDndError ? `error: ${lastGworkspaceDndError}` : `ok (active=${lastGworkspaceMeetingActive ? "yes" : "no"}, events=${lastGworkspaceMeetingCount})`}`,
@@ -988,7 +999,7 @@ function buildMainDashboardItems(config: SoundConfig, meetingActive: boolean, pr
     { value: "fellowDnd", label: `  ├─ Meeting DND: ${config.fellowDndEnabled ? "on" : "off"}`, description: `Space: Toggle meeting muting • Status: ${meetingActive ? "active" : "idle"}` },
     { value: "lead", label: `  ├─ Meeting buffer: ${config.fellowLeadMinutes}m`, description: "←→: Adjust quickly • Enter: Choose a buffer" },
     { value: "processDnd", label: `  ├─ Meeting apps DND: ${config.dndEnabled ? "on" : "off"}`, description: `${processActive ? "Space: Toggle • Status: Active now • " : "Space: Toggle • "}Watches ${formatMeetingAppsSupport(config.dndProcesses)}` },
-    { value: "nightMute", label: `  ├─ Night mute: ${config.nightMuteEnabled ? "on" : "off"}`, description: `Space: Toggle • Mutes all sounds after ${formatHourLabel(config.muteAfterHour)}` },
+    { value: "nightMute", label: `  ├─ Night mute: ${config.nightMuteEnabled ? "on" : "off"}`, description: `Space: Toggle • Mutes from ${formatHourLabel(config.muteAfterHour)} until ${formatHourLabel(NIGHT_MUTE_UNTIL_HOUR)}` },
     { value: "muteAfter", label: `  └─ Mute after: ${formatHourLabel(config.muteAfterHour)}`, description: "←→: Adjust quickly • Enter: Choose an hour" },
   ];
 }
