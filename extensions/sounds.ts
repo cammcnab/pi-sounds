@@ -92,6 +92,8 @@ const SOUND_ROOT = path.join(os.homedir(), ".pi", "sounds");
 const THEMES_DIR = path.join(SOUND_ROOT, "themes");
 const THEME_SEARCH_DIRS = [THEMES_DIR, BUNDLED_THEMES_DIR];
 const CONFIG_PATH = path.join(SOUND_ROOT, "config.json");
+const INSTANCES_DIR = path.join(SOUND_ROOT, "instances");
+const INSTANCE_FILE = path.join(INSTANCES_DIR, `${process.pid}.json`);
 const PI_AGENT_DIR = path.join(os.homedir(), ".pi", "agent");
 const GIT_PACKAGES_DIR = path.join(PI_AGENT_DIR, "git");
 const MAIN_EXTENSIONS_FELLOW_DIR = path.join(PI_AGENT_DIR, "extensions", "fellow");
@@ -131,6 +133,9 @@ let fellowAuthModulePromise: Promise<FellowAuthModule> | undefined;
 let fellowMcpModulePromise: Promise<FellowMcpModule> | undefined;
 let gworkspaceAuthModulePromise: Promise<GworkspaceAuthModule> | undefined;
 let lastDashboardIndex = 0;
+let localThemeOverride: string | undefined;
+let localThemeOverrideLoaded = false;
+let staleInstancesCleaned = false;
 
 function clampVolume(value: number): number {
   if (!Number.isFinite(value)) return DEFAULT_CONFIG.volume;
@@ -174,6 +179,70 @@ async function ensureConfig(): Promise<SoundConfig> {
   } catch {
     await saveConfig(DEFAULT_CONFIG);
     return { ...DEFAULT_CONFIG };
+  }
+}
+
+async function loadLocalThemeOverride(): Promise<string | undefined> {
+  if (localThemeOverrideLoaded) return localThemeOverride;
+  try {
+    const raw = await fs.readFile(INSTANCE_FILE, "utf8");
+    const parsed = JSON.parse(raw) as { theme?: unknown };
+    const theme = typeof parsed?.theme === "string" ? parsed.theme.trim() : "";
+    localThemeOverride = theme || undefined;
+  } catch {
+    localThemeOverride = undefined;
+  }
+  localThemeOverrideLoaded = true;
+  return localThemeOverride;
+}
+
+async function setLocalThemeOverride(theme: string | null): Promise<void> {
+  await fs.mkdir(INSTANCES_DIR, { recursive: true });
+  if (theme && theme.trim()) {
+    localThemeOverride = theme.trim();
+    await fs.writeFile(INSTANCE_FILE, `${JSON.stringify({ theme: localThemeOverride }, null, 2)}\n`, "utf8");
+  } else {
+    localThemeOverride = undefined;
+    try {
+      await fs.unlink(INSTANCE_FILE);
+    } catch {
+      // already gone
+    }
+  }
+  localThemeOverrideLoaded = true;
+}
+
+function getEffectiveTheme(config: SoundConfig): string {
+  return localThemeOverride ?? config.theme;
+}
+
+async function cleanupStaleInstances(): Promise<void> {
+  if (staleInstancesCleaned) return;
+  staleInstancesCleaned = true;
+  try {
+    const entries = await fs.readdir(INSTANCES_DIR);
+    for (const entry of entries) {
+      const match = entry.match(/^(\d+)\.json$/);
+      if (!match) continue;
+      const pid = Number(match[1]);
+      if (!Number.isFinite(pid) || pid === process.pid) continue;
+      let alive = true;
+      try {
+        process.kill(pid, 0);
+      } catch (error) {
+        const code = (error as NodeJS.ErrnoException).code;
+        alive = code === "EPERM";
+      }
+      if (!alive) {
+        try {
+          await fs.unlink(path.join(INSTANCES_DIR, entry));
+        } catch {
+          // best effort
+        }
+      }
+    }
+  } catch {
+    // directory may not exist yet; nothing to clean
   }
 }
 
@@ -834,7 +903,8 @@ async function playCategory(category: SoundCategory, options?: { bypassDnd?: boo
     return;
   }
 
-  await playThemeCategory(config.theme, category, config.volume);
+  await loadLocalThemeOverride();
+  await playThemeCategory(getEffectiveTheme(config), category, config.volume);
 }
 
 async function playRandomTestSound(): Promise<void> {
@@ -917,9 +987,9 @@ function formatMeetingAppsSupport(processes: string[]): string {
   return [...labels].join(", ");
 }
 
-type SoundsDashboardView = "main" | "theme" | "volume" | "lead" | "muteAfter" | "test" | "status";
+type SoundsDashboardView = "main" | "theme" | "localTheme" | "volume" | "lead" | "muteAfter" | "test" | "status";
 
-type MainDashboardAction = "theme" | "volume" | "enabled" | "dnd" | "lead" | "fellowDnd" | "processDnd" | "nightMute" | "muteAfter" | "test" | "status";
+type MainDashboardAction = "theme" | "localTheme" | "volume" | "enabled" | "dnd" | "lead" | "fellowDnd" | "processDnd" | "nightMute" | "muteAfter" | "test" | "status";
 
 type HookColumn = {
   key: SoundCategory;
@@ -994,6 +1064,15 @@ function buildMainDashboardItems(config: SoundConfig, meetingActive: boolean, pr
     { value: "status", label: "Status", description: "Enter: Open live meeting / DND diagnostics" },
     { value: "volume", label: `Volume: ${Math.round(config.volume * 100)}%`, description: "←→: Adjust quickly • Enter: Choose a fixed value" },
     { value: "theme", label: `Theme: ${formatThemeLabel(config.theme)}`, description: "Enter: Browse themes • Space: Preview current theme" },
+    {
+      value: "localTheme",
+      label: localThemeOverride
+        ? `  └─ Local theme: ${formatThemeLabel(localThemeOverride)}`
+        : `  └─ Local theme: Global (${formatThemeLabel(config.theme)})`,
+      description: localThemeOverride
+        ? "Enter: Change • Space: Preview • ←: Reset to global"
+        : "Enter: Override this Pi instance only • Space: Preview",
+    },
     { value: "test", label: "Assign sounds", description: "Enter: Open the assignment grid • Space: Play a random sound" },
     { value: "dnd", label: `DND: ${config.dndEnabled || config.fellowDndEnabled || config.nightMuteEnabled ? "on" : "off"}`, description: "Space: Toggle all automatic muting" },
     { value: "fellowDnd", label: `  ├─ Meeting DND: ${config.fellowDndEnabled ? "on" : "off"}`, description: `Space: Toggle meeting muting • Status: ${meetingActive ? "active" : "idle"}` },
@@ -1042,6 +1121,8 @@ async function showSoundsDashboard(ctx: any, config: SoundConfig, meetingActive:
           return "↑↓ move • space toggle • ←→ quick adjust • enter menu • esc close";
         case "theme":
           return "↑↓ browse • space preview • enter preview + choose • esc back";
+        case "localTheme":
+          return "↑↓ browse • space preview • enter apply to this Pi instance • esc back";
         case "test":
           return "↑↓ sounds • ←→ hooks • enter toggle assignment • space preview • esc save + back";
         case "volume":
@@ -1100,6 +1181,16 @@ async function showSoundsDashboard(ctx: any, config: SoundConfig, meetingActive:
         case "theme":
           await playThemePreview(currentConfig.theme, currentConfig.volume);
           return;
+        case "localTheme": {
+          if (direction === -1 && localThemeOverride) {
+            await setLocalThemeOverride(null);
+            rebuildList();
+            tui.requestRender();
+            return;
+          }
+          await playThemePreview(getEffectiveTheme(currentConfig), currentConfig.volume);
+          return;
+        }
         case "volume": {
           if (!direction) return;
           const nextVolume = stepIndex(QUICK_VOLUME_STEPS, currentConfig.volume, direction);
@@ -1145,6 +1236,9 @@ async function showSoundsDashboard(ctx: any, config: SoundConfig, meetingActive:
           switch (currentMainAction()) {
             case "theme":
               view = "theme";
+              break;
+            case "localTheme":
+              view = "localTheme";
               break;
             case "volume":
               view = "volume";
@@ -1316,6 +1410,69 @@ async function showSoundsDashboard(ctx: any, config: SoundConfig, meetingActive:
             void (async () => {
               await playThemePreview(themeName, currentConfig.volume);
               await persistConfig({ ...currentConfig, theme: themeName });
+              view = "main";
+              rebuildList();
+              tui.requestRender();
+            })();
+          };
+          selectList.onCancel = () => {
+            view = "main";
+            rebuildList();
+            tui.requestRender();
+          };
+          tui.requestRender();
+        })();
+        return;
+      }
+
+      if (view === "localTheme") {
+        selectList = null;
+        void (async () => {
+          const themes = await listInstalledThemes();
+          if (themes.length === 0) {
+            view = "main";
+            ctx.ui.notify("No sound themes installed in ~/.pi/sounds/themes", "error");
+            rebuildList();
+            tui.requestRender();
+            return;
+          }
+
+          const resetLabel = `Reset to global (${formatThemeLabel(currentConfig.theme)})`;
+          const resetItem: SelectItem = {
+            value: "__global__",
+            label: resetLabel,
+            description: localThemeOverride ? "Enter: Clear local override" : "Currently following global",
+          };
+          const themeItems = themes.map((themeName) => ({
+            value: themeName,
+            label: formatThemeLabel(themeName),
+            description:
+              themeName === localThemeOverride
+                ? "Active local override"
+                : themeName === currentConfig.theme
+                  ? "Same as global"
+                  : "Space previews • Enter applies to this Pi instance",
+          }));
+          const items: SelectItem[] = [resetItem, ...themeItems];
+          selectList = new SelectList(items, Math.min(items.length, MAX_SOUNDS_MENU_VISIBLE), listTheme);
+          const activeLocal = localThemeOverride;
+          const initialIndex = activeLocal ? Math.max(0, themes.indexOf(activeLocal)) + 1 : 0;
+          selectList.setSelectedIndex(initialIndex);
+          let localPickerIndex = initialIndex;
+          selectList.onSelectionChange = (item) => {
+            const index = items.findIndex((candidate) => candidate.value === item.value);
+            if (index >= 0) localPickerIndex = index;
+          };
+          selectList.onSelect = () => {
+            const choice = items[localPickerIndex]?.value;
+            if (!choice) return;
+            void (async () => {
+              if (choice === "__global__") {
+                await setLocalThemeOverride(null);
+              } else {
+                await playThemePreview(choice, currentConfig.volume);
+                await setLocalThemeOverride(choice);
+              }
               view = "main";
               rebuildList();
               tui.requestRender();
@@ -1542,6 +1699,16 @@ async function showSoundsDashboard(ctx: any, config: SoundConfig, meetingActive:
           return;
         }
 
+        if (view === "localTheme" && data === " ") {
+          const themeName = selectList?.getSelectedItem()?.value;
+          if (themeName && themeName !== "__global__") {
+            void playThemePreview(themeName, currentConfig.volume);
+          } else if (themeName === "__global__") {
+            void playThemePreview(currentConfig.theme, currentConfig.volume);
+          }
+          return;
+        }
+
         if (view === "test") {
           if (kb.matches(data, "tui.select.cancel")) {
             void (async () => {
@@ -1633,6 +1800,8 @@ export default function soundsExtension(pi: ExtensionAPI) {
       const config = await ensureConfig();
       const meetingActive = await isMeetingDndActive(config);
       const processActive = await isProcessDndActive(config);
+      await loadLocalThemeOverride();
+      await cleanupStaleInstances();
       await showSoundsDashboard(ctx, config, meetingActive, processActive);
     },
   });
