@@ -29,6 +29,7 @@ const tui = await loadFirst<any>([
 export const DynamicBorder = codingAgent.DynamicBorder;
 export const Container = tui.Container;
 export const SelectList = tui.SelectList;
+export const truncateToWidth = tui.truncateToWidth;
 
 // Types are erased at runtime; expose loose `any` aliases so consumers keep
 // type-checking shape without needing the scoped types to resolve at compile

@@ -4,6 +4,7 @@ import {
   SelectList,
   type ExtensionAPI,
   type SelectItem,
+  truncateToWidth,
 } from "./pi-deps.ts";
 import { promises as fs } from "node:fs";
 import os from "node:os";
@@ -1066,12 +1067,10 @@ function buildMainDashboardItems(config: SoundConfig, meetingActive: boolean, pr
     { value: "theme", label: `Theme: ${formatThemeLabel(config.theme)}`, description: "Enter: Browse themes • Space: Preview current theme" },
     {
       value: "localTheme",
-      label: localThemeOverride
-        ? `  └─ Local theme: ${formatThemeLabel(localThemeOverride)}`
-        : `  └─ Local theme: Global (${formatThemeLabel(config.theme)})`,
+      label: localThemeOverride ? `  └─ Local: ${formatThemeLabel(localThemeOverride)}` : "  └─ Local: Global",
       description: localThemeOverride
-        ? "Enter: Change • Space: Preview • ←: Reset to global"
-        : "Enter: Override this Pi instance only • Space: Preview",
+        ? `Overrides global ${formatThemeLabel(config.theme)} • Enter: Change • ←: Reset`
+        : `Using ${formatThemeLabel(config.theme)} • Enter: Override this Pi instance`,
     },
     { value: "test", label: "Assign sounds", description: "Enter: Open the assignment grid • Space: Play a random sound" },
     { value: "dnd", label: `DND: ${config.dndEnabled || config.fellowDndEnabled || config.nightMuteEnabled ? "on" : "off"}`, description: "Space: Toggle all automatic muting" },
@@ -1657,7 +1656,7 @@ async function showSoundsDashboard(ctx: any, config: SoundConfig, meetingActive:
 
         lines.push("");
         lines.push(theme.fg("dim", currentHelp()));
-        return lines;
+        return lines.map((line) => truncateToWidth(line, width));
       },
       invalidate() {
         selectList?.invalidate?.();
